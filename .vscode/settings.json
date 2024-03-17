@@ -1,0 +1,10 @@
+{
+  "vsmqtt.brokerProfiles": [
+    {
+      "name": "mqtt.slnet.uk",
+      "host": "mqtt.slnet.uk",
+      "port": 1883,
+      "clientId": "vsmqtt_client_148d"
+    }
+  ]
+}
