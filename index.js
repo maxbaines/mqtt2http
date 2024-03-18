@@ -33,6 +33,9 @@ const MQTT_SUBSCRIBE = process.env.MQTT_SUBSCRIBE
 const HTTP_URL = process.env.HTTP_URL
   ? Handlebars.compile(process.env.HTTP_URL)
   : undefined;
+
+const HTTP_URLS = JSON.parse(process.env.HTTP_URLS);
+
 const HTTP_JSON = !!process.env.HTTP_JSON;
 const HTTP_REQUEST = process.env.HTTP_REQUEST
   ? Handlebars.compile(process.env.HTTP_REQUEST)
@@ -63,46 +66,52 @@ client.on("error", debug.bind(null, "error"));
 client.on("message", (topic, message, packet) => {
   debug("message", topic, message, packet);
 
-  let messageString = message.toString();
-  let messageObject = IS_JSON.test(messageString)
-    ? JSON.parse(messageString)
-    : undefined;
+  let topics = topic.split("/");
 
-  let options = HTTP_REQUEST
-    ? JSON.parse(
-        HTTP_REQUEST({
-          topic: topic,
-          message: messageObject || messageString,
-        })
-      )
-    : {};
+  if (topics.length === 5) {
+    let messageString = message.toString();
+    let messageObject = IS_JSON.test(messageString)
+      ? JSON.parse(messageString)
+      : undefined;
 
-  if (messageObject && HTTP_JSON) {
-    options.json = true;
-    options.body = {
-      topic: topic,
-      message: messageObject,
-    };
-  }
+    let options = HTTP_REQUEST
+      ? JSON.parse(
+          HTTP_REQUEST({
+            topic: topic,
+            message: messageObject || messageString,
+          })
+        )
+      : {};
 
-  if (HTTP_URL) {
-    options.uri = HTTP_URL({
-      topic: topic,
-      message: messageObject || messageString,
-    });
-  }
+    if (messageObject && HTTP_JSON) {
+      options.json = true;
+      options.body = {
+        topic: topic,
+        message: messageObject,
+      };
+    }
+    if (HTTP_URLS) {
+      // Access the value of "test"
+      let url = HTTP_URLS[topics[3]];
 
-  debug("request", options);
+      options.uri = url;
+    }
 
-  if (!DEBUG_NOOP) {
-    request(options, (error, response, body) => {
-      debug.bind(null, "response");
+    debug("request", options);
 
-      client.publish(
-        "te/response/" + options.body.topic,
-        JSON.stringify(options.body.message)
-      );
-    });
+    if (!DEBUG_NOOP) {
+      request(options, (error, response, body) => {
+        debug.bind(null, "response");
+        if (response != null)
+          client.publish(
+            "v1/function/res/" +
+              topics[topics.length - 2] +
+              "/" +
+              topics[topics.length - 1],
+            JSON.stringify(response.body.message)
+          );
+      });
+    }
   }
 });
 
